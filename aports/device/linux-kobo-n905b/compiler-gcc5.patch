@@ -1,0 +1,72 @@
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index 103f7ee9..90501ce2 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -27,7 +27,7 @@ void *return_address(unsigned int);
+ 
+ #else
+ 
+-extern inline void *return_address(unsigned int level)
++static inline void *return_address(unsigned int level)
+ {
+ 	return NULL;
+ }
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index df246da4..48173b4f 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -9,6 +9,7 @@
+  * the Free Software Foundation.
+  */
+ #include <linux/module.h>
++#include <linux/ftrace.h>
+ 
+ #if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND)
+ #include <linux/sched.h>
+@@ -55,17 +56,6 @@ void *return_address(unsigned int level)
+ 		return NULL;
+ }
+ 
+-#else /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+-
+-#if defined(CONFIG_ARM_UNWIND)
+-#warning "TODO: return_address should use unwind tables"
+-#endif
+-
+-void *return_address(unsigned int level)
+-{
+-	return NULL;
+-}
+-
+-#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) / else */
++#endif /* if defined(CONFIG_FRAME_POINTER) && !defined(CONFIG_ARM_UNWIND) */
+ 
+ EXPORT_SYMBOL_GPL(return_address);
+diff --git a/include/linux/compiler-gcc.h b/include/linux/compiler-gcc.h
+index 0da5b187..4824d730 100644
+--- a/include/linux/compiler-gcc.h
++++ b/include/linux/compiler-gcc.h
+@@ -93,3 +93,9 @@
+ #if !defined(__noclone)
+ #define __noclone	/* not needed */
+ #endif
++
++/*
++ * A trick to suppress uninitialized variable warning without generating any
++ * code
++ */
++ #define uninitialized_var(x) x = x
+\ No newline at end of file
+diff --git a/kernel/timeconst.pl b/kernel/timeconst.pl
+index eb51d76e..04612394 100644
+--- a/kernel/timeconst.pl
++++ b/kernel/timeconst.pl
+@@ -370,7 +370,7 @@ if ($hz eq '--can') {
+ 	}
+ 
+ 	@val = @{$canned_values{$hz}};
+-	if (!defined(@val)) {
++	if (!@val) {
+ 		@val = compute_values($hz);
+ 	}
+ 	output($hz, @val);

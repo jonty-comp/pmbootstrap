@@ -1,0 +1,27 @@
+pkgname=device-kobo-n905b
+pkgver=1
+pkgrel=1
+pkgdesc="Kobo Touch (N905B)"
+url="https://github.com/postmarketOS"
+arch="noarch"
+license="MIT"
+depends="linux-kobo-n905b"
+makedepends=""
+install=""
+subpackages=""
+source="deviceinfo initfs-hook.sh"
+options="!check"
+
+build() {
+	return 0
+}
+
+package() {
+	install -D -m644 "$srcdir/deviceinfo" \
+		"$pkgdir/etc/deviceinfo"
+	install -D -m644 "$srcdir"/initfs-hook.sh \
+		"$pkgdir"/etc/postmarketos-mkinitfs/hooks/00-${pkgname}.sh
+}
+
+sha512sums="b698dec4b1d21bbbf241535b8e525a9a51696979663f12acca5d080c186bef988ac396e8c7ce21765cbfb8b0e034944c90a42bf645974784fa0b1e8c5e3a05ce  deviceinfo
+8590967fa10388a890fdfafdb1070b9ab22dc89e06a3a8834806c772191e3b67de7b914b0d68e5ddf581cee715cb90f3f24abcb8762c415ff328c6da23e55d52  initfs-hook.sh"

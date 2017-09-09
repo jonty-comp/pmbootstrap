@@ -1,0 +1,109 @@
+# APKBUILD based on linux-vanilla aport. Changes:
+# - disabled module installation
+# - add !check !tracedeps
+# - package: just install zimage and kernel.release, because the kernel config
+#	does not generate modules or dtb files
+# - do not create -dev subpackage (makes no sense without module support)
+#
+# Kernel config based on: arch/arm/configs/lineageos_grouper_defconfig
+# Changes:
+# - enable devtmpfs (needed for udev -> touch support in weston)
+
+_vendor=kobo
+_flavor=kobo-n905b
+_hash="70889a3c6208c94abfab0eb90cfff3ccea3b3579"
+_config="config-${_flavor}.armhf"
+
+pkgname=linux-${_flavor}
+pkgver=2.6.35-3
+case $pkgver in
+	*.*.*)  _kernver=${pkgver%.*};;
+	*.*) _kernver=$pkgver;;
+esac
+pkgrel=4
+arch="armhf"
+pkgdesc="Kernel for kobo glo, mini, touch (imx507) with changes for running X11"
+url="https://github.com/marek-g/kobo-kernel-2.6.35.3-marek"
+depends="postmarketos-mkinitfs"
+makedepends="perl sed installkernel bash gmp-dev bc linux-headers elfutils-dev"
+options="!strip !check !tracedeps"
+install=
+source="
+	$pkgname-$_hash.tar.gz::$url/archive/${_hash}.tar.gz
+	$_config
+	compiler-gcc6.h
+	delete-config.patch
+	compiler-gcc5.patch
+"
+subpackages=""
+license="GPL2"
+
+_abi_release=${pkgver}
+_carch="arm"
+HOSTCC="${CC:-gcc}"
+HOSTCC="${HOSTCC#${CROSS_COMPILE}}"
+
+ksrcdir="$srcdir/kobo-kernel-2.6.35.3-marek-${_hash}"
+
+prepare() {
+	local _patch_failed=
+	cd "$ksrcdir"
+
+	# first apply patches in specified order
+	for i in $source; do
+		case $i in
+		*.patch)
+			msg "Applying $i..."
+			if ! patch -s -p1 -N -i "$srcdir"/$i; then
+				echo $i >>failed
+				_patch_failed=1
+			fi
+			;;
+		esac
+	done
+
+	if ! [ -z "$_patch_failed" ]; then
+		error "The following patches failed:"
+		cat failed
+		return 1
+	fi
+
+	# gcc6 support
+	cp -v "$srcdir/compiler-gcc6.h" "$ksrcdir/include/linux/"
+
+	mkdir -p "$srcdir"/build
+	cp "$srcdir"/$_config "$srcdir"/build/.config || return 1
+	make -C "$ksrcdir" O="$srcdir"/build ARCH="$_carch" HOSTCC="$HOSTCC" \
+		silentoldconfig
+}
+
+
+
+# this is so we can do: 'abuild menuconfig' to reconfigure kernel
+menuconfig() {
+	cd "$srcdir"/build || return 1
+	make ARCH="$_carch" menuconfig
+	cp .config "$startdir"/$_config
+}
+
+build() {
+	cd "$srcdir"/build
+	unset LDFLAGS
+	make ARCH="$_carch" CC="${CC:-gcc}" \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-Alpine" \
+		|| return 1
+}
+
+package() {
+	install -Dm644 "$srcdir/build/arch/arm/boot/zImage" \
+		"$pkgdir/boot/vmlinuz-$_flavor"
+
+	install -D "$srcdir/build/include/config/kernel.release" \
+		"$pkgdir/usr/share/kernel/$_flavor/kernel.release"
+}
+
+sha512sums="75b87cef98aef6a664eab37835f2a2dec31ed404c1d6e7552bbd6a733ea85ea5448ed6f605f27883aaa9dbcf3c4685acd7a04ccb0a7d42ce92b32bb43ae96716  linux-kobo-n905b-70889a3c6208c94abfab0eb90cfff3ccea3b3579.tar.gz
+9579f5871e700919254d19cbf16905a6d87216460c861ba36456ae0dc9dbba9c63a26a5e7b4ff42d75888288b038018c12413f50cd7aa66e9e167b8416510687  config-kobo-n905b.armhf
+d80980e9474c82ba0ef1a6903b434d8bd1b092c40367ba543e72d2c119301c8b2d05265740e4104ca1ac5d15f6c4aa49e8776cb44264a9a28dc551e0d1850dcc  compiler-gcc6.h
+73ddc43ecb11859e1462a7b9121b69bbafeb994a2df9ffd3bab4d4ecf7ee8a54c68703ebca6f7cf09515b99ef355b44016aa00e69f72420e6568b1613609bc38  delete-config.patch
+14297ab2d0df59d02423b732c14e48c6552f098fd46552fc55d2dee0e48589cd4e0c135f448fc85f3e5e7e4c0db897c5b7116be39d5f55b761ba42fba1f8c8d9  compiler-gcc5.patch"
